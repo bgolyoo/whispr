@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
   import { decryptText, loadKey } from '$lib/crypto';
   import { onMount } from 'svelte';
@@ -43,7 +44,9 @@
     Below is the decrypted secret shared with you.
   </p>
   <div class="grid w-full gap-2">
-    <Textarea class="!cursor-text" disabled bind:value={textAreaValue} rows={6}></Textarea>
+    <Label class="sr-only" for="secret">Secret</Label>
+    <Textarea id="secret" class="!cursor-text" disabled bind:value={textAreaValue} rows={6}
+    ></Textarea>
 
     <Button variant="outline" href="/">Back</Button>
   </div>

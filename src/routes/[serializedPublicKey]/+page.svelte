@@ -1,5 +1,6 @@
 <script lang="ts">
   import { Button } from '$lib/components/ui/button';
+  import { Label } from '$lib/components/ui/label';
   import { Textarea } from '$lib/components/ui/textarea';
   import { UrlCopy } from '$lib/components/ui/url-copy';
   import { encryptText, loadKey } from '$lib/crypto';
@@ -44,7 +45,9 @@
       <p class="lg:text-md/relaxed text-right text-gray-500 md:text-sm/relaxed">
         {textAreaValue.length} / 500
       </p>
-      <Textarea bind:value={textAreaValue} maxlength={textAreaMaxLength} rows={6}></Textarea>
+      <Label class="sr-only" for="secret">Secret</Label>
+      <Textarea id="secret" bind:value={textAreaValue} maxlength={textAreaMaxLength} rows={6}
+      ></Textarea>
     </div>
     <Button class="w-full" disabled={textAreaValue.length === 0} on:click={encrypt}>Encrypt</Button>
   </div>

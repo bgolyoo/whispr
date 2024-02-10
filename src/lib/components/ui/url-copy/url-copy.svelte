@@ -1,6 +1,7 @@
 <script>
   import { Input } from '$lib/components/ui/input';
   import { Button } from '$lib/components/ui/button';
+  import { Label } from '$lib/components/ui/label';
 
   export let url = '';
 
@@ -13,8 +14,9 @@
 </script>
 
 <div class="flex">
+  <Label class="sr-only" for="url">Url</Label>
   <Input
-    id="link"
+    id="url"
     type="text"
     placeholder=""
     autocapitalize="none"
