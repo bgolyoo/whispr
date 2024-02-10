@@ -110,7 +110,9 @@ export async function encryptText(
   );
 
   // Convert the encrypted buffer to a base64 string
-  const encryptedDataBase64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+  let encryptedDataBase64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+  // Escape characters that are not allowed in a URL
+  encryptedDataBase64 = encodeURIComponent(encryptedDataBase64);
 
   // Export the symmetric key to a JsonWebKey object
   const symmetricKeyData = await crypto.subtle.exportKey('jwk', symmetricKey);
@@ -126,9 +128,11 @@ export async function encryptText(
   );
 
   // Convert the encrypted symmetric key buffer to a base64 string
-  const encryptedSymmetricKeyBase64 = btoa(
+  let encryptedSymmetricKeyBase64 = btoa(
     String.fromCharCode(...new Uint8Array(encryptedSymmetricKeyBuffer))
   );
+  // Escape characters that are not allowed in a URL
+  encryptedSymmetricKeyBase64 = encodeURIComponent(encryptedSymmetricKeyBase64);
 
   return { encryptedDataBase64, encryptedSymmetricKeyBase64 };
 }
@@ -142,7 +146,9 @@ export async function decryptText(
   encryptedDataBase64: string
 ): Promise<string> {
   // Convert the encrypted symmetric key from base64 to a buffer
-  const encryptedKeyBuffer = Uint8Array.from(atob(encryptedKeyBase64), (c) => c.charCodeAt(0));
+  const encryptedKeyBuffer = Uint8Array.from(atob(decodeURIComponent(encryptedKeyBase64)), (c) =>
+    c.charCodeAt(0)
+  );
 
   // Decrypt the symmetric key using the private key
   const symmetricKeyBuffer = await crypto.subtle.decrypt(
@@ -164,7 +170,9 @@ export async function decryptText(
   );
 
   // Convert the encrypted data from base64 to a buffer
-  const encryptedBuffer = Uint8Array.from(atob(encryptedDataBase64), (c) => c.charCodeAt(0));
+  const encryptedBuffer = Uint8Array.from(atob(decodeURIComponent(encryptedDataBase64)), (c) =>
+    c.charCodeAt(0)
+  );
 
   // Decrypt the data using the symmetric key
   const decryptedBuffer = await crypto.subtle.decrypt(
