@@ -2,6 +2,7 @@
   import '../app.pcss';
   import { Toaster } from '$lib/components/ui/sonner';
   import { ModeWatcher } from 'mode-watcher';
+  import { LightSwitch } from '$lib/components/ui/light-switch';
 
   const title = 'Whispr';
   const description =
@@ -30,6 +31,7 @@
 
 <ModeWatcher track={false} />
 <Toaster />
+<LightSwitch />
 
 <div class="container px-4 py-12 md:px-6 md:py-24 lg:py-32">
   <div class="mx-auto grid max-w-screen-sm gap-8">
