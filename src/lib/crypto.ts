@@ -1,7 +1,27 @@
-const ALGO_NAME = 'RSA-OAEP';
-const ALGO_HASH = 'SHA-256';
-const ALGO_KEY_LENGTH = 2048;
+const ASYMMETRIC_ALGO_NAME = 'RSA-OAEP';
+const ASYMMETRIC_ALGO_HASH = 'SHA-256';
+const ASYMMETRIC_ALGO_KEY_MODULUS_LENGTH = 2048;
 
+const SYMMETRIC_ALGO_NAME = 'AES-GCM';
+const SYMMETRIC_ALGO_KEY_LENGTH = 256;
+
+/**
+ * Generate a symmetric key for encrypting and decrypting data
+ */
+export async function generateSymmetricKey() {
+  return await crypto.subtle.generateKey(
+    {
+      name: SYMMETRIC_ALGO_NAME,
+      length: SYMMETRIC_ALGO_KEY_LENGTH
+    },
+    true,
+    ['encrypt', 'decrypt']
+  );
+}
+
+/**
+ * Generate a public/private key pair for encrypting and decrypting data
+ */
 export async function generateKeyPair() {
   let serializedPublicKey = localStorage.getItem('publicKey');
 
@@ -11,10 +31,10 @@ export async function generateKeyPair() {
 
   const keyPair = await crypto.subtle.generateKey(
     {
-      name: ALGO_NAME,
-      modulusLength: ALGO_KEY_LENGTH,
+      name: ASYMMETRIC_ALGO_NAME,
+      modulusLength: ASYMMETRIC_ALGO_KEY_MODULUS_LENGTH,
       publicExponent: new Uint8Array([1, 0, 1]),
-      hash: ALGO_HASH
+      hash: ASYMMETRIC_ALGO_HASH
     },
     true,
     ['encrypt', 'decrypt']
@@ -32,47 +52,127 @@ export async function generateKeyPair() {
   return serializedPublicKey;
 }
 
+/**
+ * Serialize a JsonWebKey object to a base64 string
+ */
 function serializeKey(key: JsonWebKey): string {
   return btoa(JSON.stringify(key));
 }
 
+/**
+ * Deserialize a base64 string to a JsonWebKey object
+ */
 function deserializeKey(serializedKey: string): JsonWebKey {
   return JSON.parse(atob(serializedKey));
 }
 
+/**
+ * Import a JsonWebKey object as a CryptoKey object
+ */
 export async function importJWKey(key: JsonWebKey, usage: KeyUsage): Promise<CryptoKey> {
   return await crypto.subtle.importKey(
     'jwk',
     key,
     {
-      name: ALGO_NAME,
-      hash: ALGO_HASH
+      name: ASYMMETRIC_ALGO_NAME,
+      hash: ASYMMETRIC_ALGO_HASH
     },
     true,
     [usage]
   );
 }
 
+/**
+ * Load a serialized key load a CryptoKey object
+ */
 export async function loadKey(serializeKey: string, usage: KeyUsage): Promise<CryptoKey> {
   return await importJWKey(deserializeKey(serializeKey), usage);
 }
 
-export async function encryptText(publicKey: CryptoKey, text: string): Promise<string> {
+/**
+ * Encrypt text using a public key
+ */
+export async function encryptText(
+  publicKey: CryptoKey,
+  text: string
+): Promise<{ encryptedDataBase64: string; encryptedSymmetricKeyBase64: string }> {
+  // Generate a symmetric key for encrypting the text
+  const symmetricKey = await generateSymmetricKey();
+
+  // Convert the text to a buffer
   const textBuffer = new TextEncoder().encode(text);
 
-  const encryptedBuffer = await crypto.subtle.encrypt({ name: ALGO_NAME }, publicKey, textBuffer);
+  // Encrypt the text using the symmetric key
+  const encryptedBuffer = await crypto.subtle.encrypt(
+    { name: SYMMETRIC_ALGO_NAME, iv: new Uint8Array(12) },
+    symmetricKey,
+    textBuffer
+  );
 
-  return btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+  // Convert the encrypted buffer to a base64 string
+  const encryptedDataBase64 = btoa(String.fromCharCode(...new Uint8Array(encryptedBuffer)));
+
+  // Export the symmetric key to a JsonWebKey object
+  const symmetricKeyData = await crypto.subtle.exportKey('jwk', symmetricKey);
+
+  // Convert the symmetric key data to a buffer
+  const symmetricKeyBuffer = new TextEncoder().encode(JSON.stringify(symmetricKeyData));
+
+  // Encrypt the symmetric key using the public key
+  const encryptedSymmetricKeyBuffer = await crypto.subtle.encrypt(
+    { name: ASYMMETRIC_ALGO_NAME },
+    publicKey,
+    symmetricKeyBuffer
+  );
+
+  // Convert the encrypted symmetric key buffer to a base64 string
+  const encryptedSymmetricKeyBase64 = btoa(
+    String.fromCharCode(...new Uint8Array(encryptedSymmetricKeyBuffer))
+  );
+
+  return { encryptedDataBase64, encryptedSymmetricKeyBase64 };
 }
 
-export async function decryptText(privateKey: CryptoKey, encryptedBase64: string): Promise<string> {
-  const encryptedBuffer = Uint8Array.from(atob(encryptedBase64), (c) => c.charCodeAt(0));
+/**
+ * Decrypt text using a private key and an encrypted symmetric key
+ */
+export async function decryptText(
+  privateKey: CryptoKey,
+  encryptedKeyBase64: string,
+  encryptedDataBase64: string
+): Promise<string> {
+  // Convert the encrypted symmetric key from base64 to a buffer
+  const encryptedKeyBuffer = Uint8Array.from(atob(encryptedKeyBase64), (c) => c.charCodeAt(0));
 
-  const decryptedBuffer = await crypto.subtle.decrypt(
-    { name: ALGO_NAME },
+  // Decrypt the symmetric key using the private key
+  const symmetricKeyBuffer = await crypto.subtle.decrypt(
+    { name: ASYMMETRIC_ALGO_NAME },
     privateKey,
+    encryptedKeyBuffer
+  );
+
+  // Convert the symmetric key buffer to a JsonWebKey object
+  const symmetricKeyData = JSON.parse(new TextDecoder().decode(symmetricKeyBuffer));
+
+  // Import the symmetric key from the JsonWebKey object
+  const symmetricKey = await crypto.subtle.importKey(
+    'jwk',
+    symmetricKeyData,
+    { name: SYMMETRIC_ALGO_NAME },
+    true,
+    ['encrypt', 'decrypt']
+  );
+
+  // Convert the encrypted data from base64 to a buffer
+  const encryptedBuffer = Uint8Array.from(atob(encryptedDataBase64), (c) => c.charCodeAt(0));
+
+  // Decrypt the data using the symmetric key
+  const decryptedBuffer = await crypto.subtle.decrypt(
+    { name: SYMMETRIC_ALGO_NAME, iv: new Uint8Array(12) },
+    symmetricKey,
     encryptedBuffer
   );
 
+  // Convert the decrypted buffer to a string and return it
   return new TextDecoder().decode(decryptedBuffer);
 }

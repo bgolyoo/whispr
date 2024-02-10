@@ -13,6 +13,7 @@
   let publicKey: CryptoKey;
 
   let textAreaValue = '';
+  const textAreaMaxLength = 500;
 
   onMount(async () => {
     if (!location.hash) {
@@ -26,9 +27,8 @@
       const serializedPublicKey = location.hash.split('#')[1];
       try {
         publicKey = await loadKey(serializedPublicKey, 'encrypt');
-      } catch (error: unknown) {
+      } catch (error) {
         showError(
-          error,
           'Unable to load public key.',
           'Unable to load public key from the url. Make sure the url is correct.'
         );
@@ -36,8 +36,7 @@
     }
   });
 
-  function showError(error: unknown, title: string, message: string) {
-    console.log(error);
+  function showError(title: string, message: string) {
     isError = true;
     errorTitle = title;
     errorMessage = message;
@@ -49,22 +48,29 @@
   }
 
   async function encrypt() {
-    console.log('encrypting', textAreaValue);
+    if (textAreaValue.length > textAreaMaxLength) {
+      showError('Text too long', `Text is too long. Maximum length is ${textAreaMaxLength}.`);
+      return;
+    }
     try {
-      const encryptedText = await encryptText(publicKey, textAreaValue);
-      url = `${window.location.href};${encryptedText}`;
-    } catch (error: unknown) {
-      showError(error, 'Unable to encrypt text.', 'Unable to encrypt the text. Please try again.');
+      const { encryptedDataBase64, encryptedSymmetricKeyBase64 } = await encryptText(
+        publicKey,
+        textAreaValue
+      );
+      url = `${window.location.href};${encryptedSymmetricKeyBase64};${encryptedDataBase64}`;
+    } catch (error) {
+      showError('Unable to encrypt text.', 'Unable to encrypt the text. Please try again.');
     }
   }
 
   async function decrypt() {
-    const [serializedPublicKey, encryptedText] = location.hash.replace('#', '').split(';');
+    const [serializedPublicKey, encryptedSymmetricKeyBase64, encryptedDataBase64] = location.hash
+      .replace('#', '')
+      .split(';');
 
     const serializedPrivateKey = localStorage.getItem(serializedPublicKey);
     if (!serializedPrivateKey) {
       showError(
-        null,
         'Unable to load private key.',
         'Unable to load private key from the local storage. Make sure the url is correct.'
       );
@@ -73,8 +79,12 @@
 
     try {
       const privateKey = await loadKey(serializedPrivateKey, 'decrypt');
-      textAreaValue = await decryptText(privateKey, encryptedText);
-    } catch (error: unknown) {
+      textAreaValue = await decryptText(
+        privateKey,
+        encryptedSymmetricKeyBase64,
+        encryptedDataBase64
+      );
+    } catch (error) {
       let title, message;
 
       if ((error as Error).toString() === 'OperationError') {
@@ -89,7 +99,7 @@
                 `;
       }
 
-      showError(error, title, message);
+      showError(title, message);
     }
   }
 </script>
@@ -105,7 +115,7 @@
   <p>No one except for the requester will see this information.</p>
 
   <textarea bind:value={textAreaValue}></textarea>
-  <div>{textAreaValue.length}</div>
+  <div>{textAreaValue.length} / 500</div>
   <button on:click={encrypt}>Encrypt</button>
 
   {#if url}
